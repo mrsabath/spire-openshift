@@ -1,0 +1,87 @@
+FROM ubuntu:22.04
+#FROM ubuntu:18.04
+
+RUN apt update && \
+    apt install -y curl && \
+    apt install coreutils && \
+    apt install -y wget && \
+    apt install -y unzip && \
+    apt install -y jq && \
+    apt install -y vim
+
+# create directory for all the tools
+RUN  mkdir -p /usr/local/bin/
+
+# install yq required for xform YAML to JSON
+RUN apt-get install -y software-properties-common && \
+    add-apt-repository ppa:rmescandon/yq && \
+    apt update && apt install -y yq
+
+# install kubectl
+RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && \
+    chmod +x kubectl && mv /kubectl /usr/local/bin
+
+# install Vault cli
+RUN VERSION=1.15.3 && \
+    wget https://releases.hashicorp.com/vault/${VERSION}/vault_${VERSION}_linux_amd64.zip && \
+    unzip vault_${VERSION}_linux_amd64.zip && \
+    mv vault /usr/local/bin/ && \
+    rm -f vault_${VERSION}_linux_amd64.zip
+
+# get a demo script from https://github.com/duglin/tools/tree/master/demoscript
+# or https://github.com/mrsabath/tools/tree/master/demoscript
+RUN curl -LO https://raw.githubusercontent.com/mrsabath/tools/master/demoscript/demoscript && \
+   chmod +x demoscript && \
+   mv demoscript /usr/local/bin
+
+COPY demo.aws-s3.sh /usr/local/bin/demo-s3.sh
+COPY demo.vault.sh /usr/local/bin/demo-vault.sh
+
+# adding Spire agent
+RUN VERSION=1.0.2 && \
+    wget https://github.com/spiffe/spire/releases/download/v${VERSION}/spire-${VERSION}-linux-x86_64-glibc.tar.gz && \
+    tar zvxf spire-${VERSION}-linux-x86_64-glibc.tar.gz && \
+    mkdir -p /opt/spire/bin && \
+    mv /spire-${VERSION}/bin/spire-agent /opt/spire/bin/ && \
+    rm -rf spire-${VERSION}/ && \
+    rm -f spire-${VERSION}-linux-x86_64-glibc.tar.gz
+
+# add AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+   unzip awscliv2.zip && \
+   ./aws/install && \
+   rm -rf aws && \
+   rm -f awscliv2.zip
+
+# setup env. variables for the demos:
+ARG DEFAULT_SPIFFE_ENDPOINT_SOCKET="/spiffe-workload-api/spire-agent.sock"
+# defaults for AWS S3 demo:
+ARG DEFAULT_AWS_WEB_IDENTITY_TOKEN_FILE="/tmp/token.jwt"
+ARG DEFAULT_S3_AUD="mys3"
+ARG DEFAULT_AWS_ROLE_ARN=""
+ARG DEFAULT_S3_CMD=""
+
+# defaults for Vault demo:
+ARG DEFAULT_VAULT_AUD="vault"
+ARG DEFAULT_VAULT_ROLE="demo-role"
+ARG DEFAULT_VAULT_ADDR="http://vault-service"
+ARG DEFAULT_VAULT_SECRET="/v1/secret/data/my-super-secret"
+ARG DEFAULT_VAULT_DATA=".data.data"
+
+# assign values for env. variables
+ENV SPIFFE_ENDPOINT_SOCKET=${DEFAULT_SPIFFE_ENDPOINT_SOCKET}
+ENV AWS_WEB_IDENTITY_TOKEN_FILE=${DEFAULT_AWS_WEB_IDENTITY_TOKEN_FILE}
+ENV S3_AUD=${DEFAULT_S3_AUD}
+ENV AWS_ROLE_ARN=${DEFAULT_AWS_ROLE_ARN}
+ENV S3_CMD=${DEFAULT_S3_CMD}
+ENV AULT_AUD=${DEFAULT_VAULT_AUD}
+ENV VAULT_ROLE=${DEFAULT_VAULT_ROLE}
+ENV VAULT_ADDR=${DEFAULT_VAULT_ADDR}
+ENV VAULT_SECRET=${DEFAULT_VAULT_SECRET}
+ENV VAULT_DATA=${DEFAULT_VAULT_DATA}
+
+ENV PATH="${PATH}:/usr/local/bin/"
+WORKDIR /tmp
+
+# run it forever
+CMD ["/bin/bash", "-c", "tail -f /dev/null"]

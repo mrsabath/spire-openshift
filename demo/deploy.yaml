@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo
+  namespace: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  namespace: demo
+  labels:
+    app: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        identity_template: "true"
+        app: demo
+    spec:
+      hostPID: false
+      hostNetwork: false
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: demo
+      containers:
+        - name: demo
+          image: docker.io/tsidentity/spire-demo:latest
+          command: ["sleep"]
+          args: ["1000000000"]
+          env:
+          - name: SPIFFE_ENDPOINT_SOCKET
+            value: "/spiffe-workload-api/spire-agent.sock"
+          - name: AWS_ROLE_ARN
+            value: "arn:aws:iam::203747186855:role/role-mc-ztna-demo"
+          - name: S3_AUD
+            value: "mys3"
+          - name: "S3_CMD"
+            value: "aws s3 cp s3://mc-ztna-demo/test -"
+          - name: AWS_WEB_IDENTITY_TOKEN_FILE
+            value: "/tmp/token.jwt"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false 
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+          - name: spiffe-workload-api
+            mountPath: /spiffe-workload-api
+          - name: empty 
+            mountPath: /.aws
+      volumes:
+      - name: spiffe-workload-api
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true
+      - name: empty
+        emptyDir: {}
