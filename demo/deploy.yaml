@@ -29,8 +29,6 @@ spec:
       containers:
         - name: demo
           image: docker.io/tsidentity/spire-demo:latest
-          command: ["sleep"]
-          args: ["1000000000"]
           env:
           - name: SPIFFE_ENDPOINT_SOCKET
             value: "/spiffe-workload-api/spire-agent.sock"
